@@ -36,3 +36,4 @@ services:
     command: >
       bash -c "pip install --no-cache-dir -r requirements.txt &&
                python -u benchmark_cdc.py"
+

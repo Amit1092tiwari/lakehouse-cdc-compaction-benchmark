@@ -123,3 +123,4 @@ spark.sql.iceberg.planning.split-size=134217728
 ## ⚖️ License
 
 Distributed under the terms of the [Apache License 2.0](LICENSE).
+

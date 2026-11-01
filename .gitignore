@@ -15,3 +15,4 @@ venv/
 # Docker & OS artifacts
 .DS_Store
 Thumbs.db
+
