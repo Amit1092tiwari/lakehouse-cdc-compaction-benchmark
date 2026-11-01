@@ -1,5 +1,6 @@
 # Lakehouse CDC Compaction & Small-File Benchmark
 
+[![CI](https://github.com/Amit1092tiwari/lakehouse-cdc-compaction-benchmark/actions/workflows/ci.yml/badge.svg)](https://github.com/Amit1092tiwari/lakehouse-cdc-compaction-benchmark/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-Compose%20Ready-blue?logo=docker)]()
 [![Python](https://img.shields.io/badge/Python-3.10+-brightgreen?logo=python)]()
