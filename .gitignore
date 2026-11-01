@@ -1,0 +1,17 @@
+# Data & Benchmark Output Caches
+data_lake/
+**/data_lake/
+*.parquet
+*.jsonl
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# Docker & OS artifacts
+.DS_Store
+Thumbs.db
