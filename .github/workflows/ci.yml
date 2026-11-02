@@ -31,3 +31,4 @@ jobs:
       - name: Verify OpenTelemetry Artifact Generated
         run: |
           test -f data_lake/otlp_metrics.json && echo "OTLP metrics successfully verified!"
+
