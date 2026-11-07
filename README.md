@@ -222,8 +222,6 @@ spark.sql.iceberg.planning.split-size=134217728
 
 ## 👤 Author & Attribution
 
-**Amitkumar Tiwari**  
-*Senior Data & Distributed Systems Architect | Technical Writer*  
 *GitHub: [@Amit1092tiwari](https://github.com/Amit1092tiwari)*
 
 ---
