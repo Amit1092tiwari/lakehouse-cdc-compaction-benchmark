@@ -220,12 +220,6 @@ spark.sql.iceberg.planning.split-size=134217728
 
 ---
 
-## 👤 Author & Attribution
-
-*GitHub: [@Amit1092tiwari](https://github.com/Amit1092tiwari)*
-
----
-
 ## ⚖️ License
 
 Distributed under the terms of the [Apache License 2.0](LICENSE).
