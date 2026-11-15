@@ -1,9 +1,7 @@
-version: "3.8"
-
 services:
   # Local S3-compatible Object Storage for Lakehouse Table Slices
   minio-lakehouse:
-    image: minio/minio:RELEASE.2024-05-10T01-41-38Z
+    image: quay.io/minio/minio:RELEASE.2024-05-10T01-41-38Z
     container_name: minio-lakehouse
     ports:
       - "9000:9000"
