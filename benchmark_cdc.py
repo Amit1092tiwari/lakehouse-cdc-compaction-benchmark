@@ -31,7 +31,8 @@ COMPACTED_DIR = WORKSPACE_DIR / "compacted_base_files"
 def setup_directories():
     """Ensure clean scratch directories for the benchmark."""
     if WORKSPACE_DIR.exists():
-        shutil.rmtree(WORKSPACE_DIR)
+        shutil.rmtree(WORKSPACE_DIR, ignore_errors=True)
+    WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
     UNCOMPACTED_DIR.mkdir(parents=True, exist_ok=True)
     COMPACTED_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -304,7 +305,7 @@ def parse_args():
         "--assert-integrity",
         action="store_true",
         default=True,
-        help="Assert 100% entity preservation and positive file count reduction (default: True)"
+        help="Assert 100%% entity preservation and positive file count reduction (default: True)"
     )
     return parser.parse_args()
 
