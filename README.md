@@ -1,6 +1,7 @@
 # Lakehouse CDC Compaction & Small-File Benchmark
 
 [![CI](https://github.com/Amit1092tiwari/lakehouse-cdc-compaction-benchmark/actions/workflows/ci.yml/badge.svg)](https://github.com/Amit1092tiwari/lakehouse-cdc-compaction-benchmark/actions/workflows/ci.yml)
+[![Nightly Benchmark](https://github.com/Amit1092tiwari/lakehouse-cdc-compaction-benchmark/actions/workflows/nightly-benchmark.yml/badge.svg)](https://github.com/Amit1092tiwari/lakehouse-cdc-compaction-benchmark/actions/workflows/nightly-benchmark.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-Compose%20Ready-blue?logo=docker)]()
 [![Python](https://img.shields.io/badge/Python-3.10+-brightgreen?logo=python)]()
@@ -127,6 +128,17 @@ pip install -r requirements.txt
 .\run_lab.ps1
 ```
 
+### Option 4: Custom Scale Factor & CLI Flags
+You can run extended stress runs by configuring the batch counts via CLI flags or environment variables:
+
+```bash
+# Execute 1,000 micro-batches (50,000 CDC mutations)
+python benchmark_cdc.py --batches 1000 --records-per-batch 50
+
+# Or via environment variables (used in CI/CD)
+BENCHMARK_BATCHES=1000 BENCHMARK_RECORDS_PER_BATCH=50 python benchmark_cdc.py
+```
+
 ---
 
 ## 🖥️ Actual Terminal Output
@@ -206,16 +218,46 @@ spark.sql.iceberg.planning.split-size=134217728
 
 ---
 
+## 🔄 Two-Tier CI/CD Architecture
+
+To balance rapid developer velocity with rigorous performance regression protection, CI/CD is structured into two distinct execution tiers:
+
+```text
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│ Tier 1: Event-Driven Fast Gate (On Push & Pull Request)                           │
+│ • Latency Budget: < 60 seconds                                                    │
+│ • Scope: Smoke test (300 micro-batches), syntax validation, artifact generation   │
+│ • Workflow: .github/workflows/ci.yml                                              │
+└────────────────────────────────────────┬──────────────────────────────────────────┘
+                                         │
+┌────────────────────────────────────────▼──────────────────────────────────────────┐
+│ Tier 2: Daily Scheduled Off-Peak Suite (Cron 02:00 UTC & Workflow Dispatch)      │
+│ • Latency Budget: ~5–10 minutes                                                   │
+│ • Scope:                                                                          │
+│   1. High-Volume Scale Benchmark (1,000+ micro-batches & performance regression)  │
+│   2. Upstream Dependency Drift Audit (DuckDB, PyArrow, OTel across Py 3.10-3.12)  │
+│   3. Security Vulnerability Scanning (pip-audit CVE checks)                       │
+│   4. Full Docker Compose & MinIO S3 Object Store End-to-End Integration           │
+│ • Workflow: .github/workflows/nightly-benchmark.yml                               │
+└───────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 🛠️ Repository Layout
 
 ```text
-├── docker-compose.yml   # MinIO S3 container and benchmark runner definition
-├── benchmark_cdc.py     # Empirical simulation and OpenTelemetry telemetry harness
-├── requirements.txt     # Python dependencies (pyarrow, duckdb, pandas, opentelemetry-sdk)
-├── run_lab.sh           # Linux/macOS bootstrap script
-├── run_lab.ps1          # Windows PowerShell bootstrap script
-├── LICENSE              # Apache 2.0 Open Source License
-└── README.md            # Benchmark documentation, telemetry specs, and results
+├── .github/
+│   └── workflows/
+│       ├── ci.yml                 # Tier 1: Fast commit/PR verification gate
+│       └── nightly-benchmark.yml  # Tier 2: Daily scheduled scale, drift & S3 integration
+├── docker-compose.yml             # MinIO S3 container and benchmark runner definition
+├── benchmark_cdc.py               # Empirical simulation and OpenTelemetry telemetry harness
+├── requirements.txt               # Python dependencies (pyarrow, duckdb, pandas, opentelemetry-sdk)
+├── run_lab.sh                     # Linux/macOS bootstrap script
+├── run_lab.ps1                    # Windows PowerShell bootstrap script
+├── LICENSE                        # Apache 2.0 Open Source License
+└── README.md                      # Benchmark documentation, telemetry specs, and results
 ```
 
 ---

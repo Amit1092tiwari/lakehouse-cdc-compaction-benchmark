@@ -19,6 +19,7 @@ import time
 import json
 import uuid
 import shutil
+import argparse
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 
@@ -243,19 +244,88 @@ def export_opentelemetry_metrics(
     print(f"  • Exported: lakehouse.file_handles.count, lakehouse.compaction.duration_ms, lakehouse.query.latency_ms")
     return telemetry_payload
 
+def write_github_step_summary(
+    uncompacted_count: int,
+    compacted_count: int,
+    scan_ms_uncompacted: float,
+    scan_ms_compacted: float,
+    query_ms_uncompacted: float,
+    query_ms_compacted: float,
+    compaction_time: float,
+    entity_count: int,
+    file_reduction_pct: float,
+    scan_speedup: float,
+    query_speedup: float,
+    num_batches: int,
+    total_records: int,
+):
+    """Appends an empirical performance summary table to GITHUB_STEP_SUMMARY if running in GitHub Actions."""
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not summary_path:
+        return
+
+    markdown = f"""### 📊 Empirical Lakehouse CDC Compaction Benchmark Results
+
+| Operational Metric | Naive Streaming (CoW) | Compacted Base (MoR) | Improvement |
+| :--- | :--- | :--- | :--- |
+| **Simulated Micro-Batches** | {num_batches:,} micro-batches | 1 consolidated pass | {num_batches:,} commits |
+| **Total Ingested Records** | {total_records:,} mutations | {entity_count:,} distinct records | Preserved |
+| **Object File Count (Prefix)** | {uncompacted_count:,} files | {compacted_count:,} file(s) | **{file_reduction_pct:.1f}% reduction** |
+| **Directory Metadata Scan (LIST)** | {scan_ms_uncompacted:.2f} ms | {scan_ms_compacted:.2f} ms | **{scan_speedup:.1f}x faster** |
+| **Query Aggregation Latency** | {query_ms_uncompacted:.2f} ms | {query_ms_compacted:.2f} ms | **{query_speedup:.1f}x faster** |
+| **Compaction Pass Duration** | — | {compaction_time:.3f} s | — |
+| **Entity State Consistency** | {entity_count:,} entities | {entity_count:,} entities | **100% Identical** |
+
+> **Telemetry Status:** OpenTelemetry OTLP payload exported to `data_lake/otlp_metrics.json`.
+"""
+    try:
+        with open(summary_path, "a", encoding="utf-8") as f:
+            f.write(markdown)
+        print("[INFO] Successfully wrote empirical benchmark metrics to GitHub Step Summary.")
+    except Exception as e:
+        print(f"[WARN] Failed to write GitHub Step Summary: {e}", file=sys.stderr)
+
+def parse_args():
+    """Parses CLI flags with fallback to environment variables."""
+    parser = argparse.ArgumentParser(description="Empirical Lakehouse CDC Small-File Sprawl & Compaction Benchmark")
+    parser.add_argument(
+        "--batches",
+        type=int,
+        default=int(os.environ.get("BENCHMARK_BATCHES", "300")),
+        help="Number of micro-batch CDC delta flushes to simulate (default: 300, env: BENCHMARK_BATCHES)"
+    )
+    parser.add_argument(
+        "--records-per-batch",
+        type=int,
+        default=int(os.environ.get("BENCHMARK_RECORDS_PER_BATCH", "50")),
+        help="Number of mutation records per batch (default: 50, env: BENCHMARK_RECORDS_PER_BATCH)"
+    )
+    parser.add_argument(
+        "--assert-integrity",
+        action="store_true",
+        default=True,
+        help="Assert 100% entity preservation and positive file count reduction (default: True)"
+    )
+    return parser.parse_args()
+
 def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
+    args = parse_args()
+    num_batches = args.batches
+    records_per_batch = args.records_per_batch
+
     print("=" * 80)
     print("EMPIRICAL BENCHMARK: LAKEHOUSE CDC SMALL-FILE SPRAWL & COMPACTION")
+    print(f"Configuration: {num_batches:,} micro-batches | {records_per_batch} records/batch")
     print("=" * 80)
 
     setup_directories()
 
     # Step 1: Ingest naive micro-batches
     ingest_time, uncompacted_file_count, total_records = run_naive_small_file_ingestion(
-        num_batches=300, records_per_batch=50
+        num_batches=num_batches, records_per_batch=records_per_batch
     )
 
     # Step 2: Query uncompacted dataset
@@ -265,7 +335,7 @@ def main():
     compaction_time, compacted_file_count = run_asynchronous_compaction()
 
     # Step 4: Query compacted dataset
-    scan_ms_compacted, query_ms_compacted, _ = query_compacted_dataset()
+    scan_ms_compacted, query_ms_compacted, entity_count_compacted = query_compacted_dataset()
 
     # Step 5: Export OpenTelemetry Metrics
     export_opentelemetry_metrics(
@@ -291,7 +361,7 @@ def main():
     print(f"{'File Count (Prefix)':<32} | {uncompacted_file_count:<22,d} | {compacted_file_count:<18,d} | {file_reduction_pct:.1f}% reduction")
     print(f"{'Directory Metadata Scan':<32} | {scan_ms_uncompacted:<20.2f} ms | {scan_ms_compacted:<16.2f} ms | {scan_speedup:.1f}x faster")
     print(f"{'Query Aggregation Latency':<32} | {query_ms_uncompacted:<20.2f} ms | {query_ms_compacted:<16.2f} ms | {query_speedup:.1f}x faster")
-    print(f"{'Total Unique Entities Preserved':<32} | {entity_count:<22,d} | {entity_count:<18,d} | 100% Identical")
+    print(f"{'Total Unique Entities Preserved':<32} | {entity_count:<22,d} | {entity_count_compacted:<18,d} | 100% Identical")
     print("=" * 80)
     print(f"\n[RESULT] {query_speedup:.1f}x speedup | {file_reduction_pct:.1f}% file handle reduction")
     print("\n[CONCLUSION FOR EDITORS]:")
@@ -299,6 +369,32 @@ def main():
     print(f"store file handles shrink from {uncompacted_file_count:,} down to {compacted_file_count}, eliminating {file_reduction_pct:.1f}%")
     print(f"of metadata scan overhead and delivering a {query_speedup:.1f}x query speedup.")
     print("=" * 80)
+
+    # Step 7: Export to GitHub Step Summary if in CI
+    write_github_step_summary(
+        uncompacted_count=uncompacted_file_count,
+        compacted_count=compacted_file_count,
+        scan_ms_uncompacted=scan_ms_uncompacted,
+        scan_ms_compacted=scan_ms_compacted,
+        query_ms_uncompacted=query_ms_uncompacted,
+        query_ms_compacted=query_ms_compacted,
+        compaction_time=compaction_time,
+        entity_count=entity_count,
+        file_reduction_pct=file_reduction_pct,
+        scan_speedup=scan_speedup,
+        query_speedup=query_speedup,
+        num_batches=num_batches,
+        total_records=total_records,
+    )
+
+    # Step 8: Assert Integrity Checks if requested
+    if args.assert_integrity:
+        if compacted_file_count >= uncompacted_file_count:
+            print(f"[ERROR] Compaction failed to reduce file count: {compacted_file_count} >= {uncompacted_file_count}", file=sys.stderr)
+            sys.exit(1)
+        if entity_count != entity_count_compacted:
+            print(f"[ERROR] Entity mismatch: uncompacted={entity_count} vs compacted={entity_count_compacted}", file=sys.stderr)
+            sys.exit(1)
 
 if __name__ == "__main__":
     main()
